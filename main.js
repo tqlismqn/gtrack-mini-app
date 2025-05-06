@@ -20,19 +20,7 @@ form.addEventListener("submit", function(event) {
   };
   orders.push(order);
   renderOrders();
-});
 
-function renderOrders() {
-  ordersDiv.innerHTML = "";
-  orders.forEach((order) => {
-    const el = document.createElement("div");
-    el.innerHTML = `
-      <strong>${order.from} → ${order.to}</strong><br>
-      Дата: ${order.date}<br>
-      Вес: ${order.weight} кг<br>
-      Цена: €${order.price} + TVA: €${order.tva}<br>
-      Дата оплаты: ${order.dueDate}<hr>
-    `;
-    ordersDiv.appendChild(el);
-  });
-}
+  // 👇 Вот эта строка отправит заявку в Telegram бота
+  tg.sendData(JSON.stringify(order));
+});
