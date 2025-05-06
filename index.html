@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>G-Track Mini App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>G-Track: Заявка</h1>
+  <form id="orderForm">
+    <input type="text" placeholder="Откуда" id="from" required>
+    <input type="text" placeholder="Куда" id="to" required>
+    <input type="date" id="date" required>
+    <input type="text" placeholder="Груз" id="cargo" required>
+    <input type="number" placeholder="Вес (кг)" id="weight" required>
+    <input type="number" placeholder="Цена (€)" id="price" required>
+    <input type="text" placeholder="Client Reference" id="reference">
+    <button type="submit">Создать заявку</button>
+  </form>
+  <div id="orders"></div>
+  <script src="main.js"></script>
+</body>
+</html>
