@@ -57,7 +57,7 @@
 
   <div id="appMessage" role="status" aria-live="polite"></div>
 
-  <main class="app-layout">
+  <main class="app-main">
     <section class="drivers-panel" aria-label="Список водителей">
       <div class="panel-header">
         <h2>Водители</h2>
@@ -69,6 +69,7 @@
             <tr>
               <th class="select-col"><input type="checkbox" id="selectAll"></th>
               <th>ФИО / контакты</th>
+              <th>Гражданство / Паспорт</th>
               <th>Статус</th>
               <th>Документы</th>
             </tr>
@@ -77,13 +78,18 @@
         </table>
       </div>
     </section>
+  </main>
 
-    <section class="card-panel" aria-label="Карточка водителя">
-      <div id="driverCard" class="card-content placeholder">
+  <div id="driverModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="driverModalTitle" hidden>
+    <div class="modal-backdrop" data-modal-dismiss></div>
+    <div class="modal-container" role="document" tabindex="-1">
+      <button type="button" class="modal-close" aria-label="Закрыть карточку">&times;</button>
+      <div id="driverCard" class="modal-body card-content placeholder">
+        <h2 id="driverModalTitle" class="visually-hidden">Карточка водителя</h2>
         <p>Выберите водителя из списка или создайте нового.</p>
       </div>
-    </section>
-  </main>
+    </div>
+  </div>
 
   <script src="main.js"></script>
 </body>

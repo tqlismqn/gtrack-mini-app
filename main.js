@@ -49,6 +49,227 @@ const DOCUMENT_STATUS_LABELS = {
   unknown: "Без срока"
 };
 
+const EU_COUNTRY_CODES = new Set([
+  "AT",
+  "BE",
+  "BG",
+  "HR",
+  "CY",
+  "CZ",
+  "DK",
+  "EE",
+  "FI",
+  "FR",
+  "DE",
+  "GR",
+  "HU",
+  "IE",
+  "IT",
+  "LV",
+  "LT",
+  "LU",
+  "MT",
+  "NL",
+  "PL",
+  "PT",
+  "RO",
+  "SK",
+  "SI",
+  "ES",
+  "SE"
+]);
+
+const COUNTRY_CODE_ALIASES = {
+  cz: "CZ",
+  "czech republic": "CZ",
+  czechia: "CZ",
+  czech: "CZ",
+  "ceska republika": "CZ",
+  cesko: "CZ",
+  "чехия": "CZ",
+  "чешская республика": "CZ",
+  sk: "SK",
+  slovakia: "SK",
+  "slovenska republika": "SK",
+  slovensko: "SK",
+  "словакия": "SK",
+  de: "DE",
+  germany: "DE",
+  deutschland: "DE",
+  "германия": "DE",
+  at: "AT",
+  austria: "AT",
+  osterreich: "AT",
+  "österreich": "AT",
+  "австрия": "AT",
+  pl: "PL",
+  poland: "PL",
+  polska: "PL",
+  "польша": "PL",
+  ua: "UA",
+  ukraine: "UA",
+  "украина": "UA",
+  ru: "RU",
+  russia: "RU",
+  "russian federation": "RU",
+  "россия": "RU",
+  "российская федерация": "RU",
+  by: "BY",
+  belarus: "BY",
+  belarussia: "BY",
+  "беларусь": "BY",
+  lt: "LT",
+  lithuania: "LT",
+  lietuva: "LT",
+  "литва": "LT",
+  lv: "LV",
+  latvia: "LV",
+  latvija: "LV",
+  "латвия": "LV",
+  ee: "EE",
+  estonia: "EE",
+  eesti: "EE",
+  "эстония": "EE",
+  ro: "RO",
+  romania: "RO",
+  romaniaa: "RO",
+  "румыния": "RO",
+  bg: "BG",
+  bulgaria: "BG",
+  balgariya: "BG",
+  "болгария": "BG",
+  hu: "HU",
+  hungary: "HU",
+  magyarorszag: "HU",
+  "венгрия": "HU",
+  it: "IT",
+  italy: "IT",
+  italia: "IT",
+  "италия": "IT",
+  es: "ES",
+  spain: "ES",
+  espana: "ES",
+  "испания": "ES",
+  pt: "PT",
+  portugal: "PT",
+  portuguesa: "PT",
+  "португалия": "PT",
+  fr: "FR",
+  france: "FR",
+  francee: "FR",
+  "франция": "FR",
+  nl: "NL",
+  netherlands: "NL",
+  nederland: "NL",
+  "нидерланды": "NL",
+  be: "BE",
+  belgium: "BE",
+  belgie: "BE",
+  "бельгия": "BE",
+  se: "SE",
+  sweden: "SE",
+  sverige: "SE",
+  "швеция": "SE",
+  fi: "FI",
+  finland: "FI",
+  suomi: "FI",
+  "финляндия": "FI",
+  dk: "DK",
+  denmark: "DK",
+  danmark: "DK",
+  "дания": "DK",
+  ie: "IE",
+  ireland: "IE",
+  eire: "IE",
+  "ирландия": "IE",
+  gr: "GR",
+  greece: "GR",
+  hellas: "GR",
+  "греция": "GR",
+  hr: "HR",
+  croatia: "HR",
+  hrvatska: "HR",
+  "хорватия": "HR",
+  si: "SI",
+  slovenia: "SI",
+  slovenija: "SI",
+  "словения": "SI",
+  mt: "MT",
+  malta: "MT",
+  maltese: "MT",
+  "мальта": "MT",
+  cy: "CY",
+  cyprus: "CY",
+  kypros: "CY",
+  "кипр": "CY",
+  lu: "LU",
+  luxembourg: "LU",
+  letzebuerg: "LU",
+  "люксембург": "LU",
+  no: "NO",
+  norway: "NO",
+  norge: "NO",
+  "норвегия": "NO",
+  gb: "GB",
+  uk: "GB",
+  "united kingdom": "GB",
+  britain: "GB",
+  "great britain": "GB",
+  "великобритания": "GB",
+  us: "US",
+  usa: "US",
+  "united states": "US",
+  america: "US",
+  "сша": "US",
+  kz: "KZ",
+  kazakhstan: "KZ",
+  "казахстан": "KZ"
+};
+
+const COUNTRY_NAME_FALLBACK = {
+  AT: "Австрия",
+  BE: "Бельгия",
+  BG: "Болгария",
+  HR: "Хорватия",
+  CY: "Кипр",
+  CZ: "Чехия",
+  DK: "Дания",
+  EE: "Эстония",
+  FI: "Финляндия",
+  FR: "Франция",
+  DE: "Германия",
+  GR: "Греция",
+  HU: "Венгрия",
+  IE: "Ирландия",
+  IT: "Италия",
+  LV: "Латвия",
+  LT: "Литва",
+  LU: "Люксембург",
+  MT: "Мальта",
+  NL: "Нидерланды",
+  PL: "Польша",
+  PT: "Португалия",
+  RO: "Румыния",
+  SK: "Словакия",
+  SI: "Словения",
+  ES: "Испания",
+  SE: "Швеция",
+  UA: "Украина",
+  RU: "Россия",
+  BY: "Беларусь",
+  NO: "Норвегия",
+  GB: "Великобритания",
+  US: "США",
+  KZ: "Казахстан"
+};
+
+const REGION_DISPLAY = typeof Intl !== "undefined" && typeof Intl.DisplayNames === "function"
+  ? new Intl.DisplayNames(["ru"], { type: "region" })
+  : null;
+
+const FOCUSABLE_SELECTORS =
+  'a[href], area[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 const driversData = [
   {
     id: "drv-001",
@@ -397,7 +618,14 @@ const state = {
   selectedDriverId: null,
   selectedDriverIds: new Set(),
   cardMode: "view",
-  filteredDrivers: []
+  filteredDrivers: [],
+  modalOpen: false
+};
+
+const modalState = {
+  previouslyFocusedElement: null,
+  scrollPosition: 0,
+  focusableElements: []
 };
 
 const elements = {
@@ -412,7 +640,11 @@ const elements = {
   statusFilter: document.getElementById("statusFilter"),
   documentFilter: document.getElementById("documentFilter"),
   czResidenceFilter: document.getElementById("czResidenceFilter"),
-  a1SwFilter: document.getElementById("a1SwFilter")
+  a1SwFilter: document.getElementById("a1SwFilter"),
+  modal: document.getElementById("driverModal"),
+  modalContainer: document.querySelector("#driverModal .modal-container"),
+  modalBackdrop: document.querySelector("#driverModal [data-modal-dismiss]"),
+  modalClose: document.querySelector("#driverModal .modal-close")
 };
 
 function init() {
@@ -454,8 +686,22 @@ function attachEvents() {
 
   elements.addDriverButton.addEventListener("click", () => {
     state.cardMode = "create";
-    renderDriverCard(null);
+    openDriverModal();
   });
+
+  if (elements.modalClose) {
+    elements.modalClose.addEventListener("click", () => closeDriverModal());
+  }
+
+  if (elements.modalBackdrop) {
+    elements.modalBackdrop.addEventListener("click", () => closeDriverModal());
+  }
+
+  if (elements.modal) {
+    elements.modal.addEventListener("keydown", handleModalKeydown);
+  }
+
+  document.addEventListener("keydown", handleGlobalKeyDown, { passive: false });
 }
 
 function refresh() {
@@ -464,17 +710,31 @@ function refresh() {
   updateSelectAllCheckbox();
   updateMassActionsState();
 
-  if (state.cardMode === "create") {
-    renderDriverCard(null);
-    return;
+  const driverStillVisible = state.selectedDriverId
+    ? state.filteredDrivers.some((driver) => driver.id === state.selectedDriverId)
+    : false;
+
+  if (!driverStillVisible && state.cardMode === "view") {
+    if (state.modalOpen) {
+      closeDriverModal();
+    }
+    state.selectedDriverId = null;
   }
 
-  if (!state.selectedDriverId || !state.filteredDrivers.some((driver) => driver.id === state.selectedDriverId)) {
-    state.selectedDriverId = state.filteredDrivers.length ? state.filteredDrivers[0].id : null;
+  if (state.modalOpen) {
+    if (state.cardMode === "create") {
+      renderDriverCard(null);
+    } else {
+      const driver = getDriverById(state.selectedDriverId);
+      if (driver) {
+        renderDriverCard(driver);
+      } else {
+        closeDriverModal();
+      }
+    }
   }
 
-  const driver = getDriverById(state.selectedDriverId);
-  renderDriverCard(driver);
+  highlightSelectedRow(state.selectedDriverId);
 }
 
 function getDriverById(id) {
@@ -521,6 +781,142 @@ function getFilteredDrivers() {
   });
 }
 
+function openDriverModal(driverId) {
+  if (typeof driverId === "string") {
+    state.selectedDriverId = driverId;
+  }
+
+  if (state.modalOpen) {
+    const driver = state.cardMode === "view" ? getDriverById(state.selectedDriverId) : null;
+    renderDriverCard(driver);
+    highlightSelectedRow(state.selectedDriverId);
+    updateModalFocusables();
+    return;
+  }
+
+  modalState.previouslyFocusedElement = document.activeElement;
+  modalState.scrollPosition = window.scrollY || document.documentElement.scrollTop || 0;
+
+  if (elements.modal) {
+    elements.modal.removeAttribute("hidden");
+  }
+
+  document.body.classList.add("modal-open");
+  document.body.style.top = `-${modalState.scrollPosition}px`;
+  state.modalOpen = true;
+
+  const driver = state.cardMode === "view" ? getDriverById(state.selectedDriverId) : null;
+  renderDriverCard(driver);
+  highlightSelectedRow(state.selectedDriverId);
+  updateModalFocusables();
+
+  requestAnimationFrame(() => {
+    focusFirstModalElement();
+  });
+}
+
+function closeDriverModal() {
+  if (!state.modalOpen) {
+    return;
+  }
+
+  state.modalOpen = false;
+  state.cardMode = "view";
+
+  if (elements.modal) {
+    elements.modal.setAttribute("hidden", "");
+  }
+
+  document.body.classList.remove("modal-open");
+  document.body.style.top = "";
+  window.scrollTo({ top: modalState.scrollPosition });
+
+  modalState.scrollPosition = 0;
+  modalState.focusableElements = [];
+
+  const focusTarget = modalState.previouslyFocusedElement;
+  modalState.previouslyFocusedElement = null;
+  if (focusTarget && typeof focusTarget.focus === "function" && document.body.contains(focusTarget)) {
+    focusTarget.focus();
+  } else if (elements.addDriverButton) {
+    elements.addDriverButton.focus();
+  }
+
+  highlightSelectedRow(state.selectedDriverId);
+}
+
+function handleModalKeydown(event) {
+  if (!state.modalOpen || event.key !== "Tab") {
+    return;
+  }
+
+  updateModalFocusables();
+  const focusables = modalState.focusableElements;
+  if (!focusables.length) {
+    event.preventDefault();
+    if (elements.modalContainer) {
+      elements.modalContainer.focus();
+    }
+    return;
+  }
+
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  const active = document.activeElement;
+
+  if (event.shiftKey && active === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function handleGlobalKeyDown(event) {
+  if (!state.modalOpen) {
+    return;
+  }
+
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeDriverModal();
+  }
+}
+
+function focusFirstModalElement() {
+  if (!state.modalOpen) {
+    return;
+  }
+  if (elements.modalContainer) {
+    elements.modalContainer.focus();
+  }
+}
+
+function updateModalFocusables() {
+  if (!elements.modal) {
+    modalState.focusableElements = [];
+    return;
+  }
+
+  const focusables = Array.from(elements.modal.querySelectorAll(FOCUSABLE_SELECTORS));
+  modalState.focusableElements = focusables.filter((element) => isFocusable(element));
+}
+
+function isFocusable(element) {
+  if (!element || element.hasAttribute("disabled") || element.getAttribute("aria-hidden") === "true") {
+    return false;
+  }
+  const style = window.getComputedStyle(element);
+  if (style.display === "none" || style.visibility === "hidden") {
+    return false;
+  }
+  if (typeof element.offsetParent !== "undefined" && element.offsetParent === null && !element.getClientRects().length) {
+    return false;
+  }
+  return true;
+}
+
 function renderDriverList() {
   elements.tableBody.innerHTML = "";
   elements.driversCount.textContent = state.filteredDrivers.length;
@@ -528,7 +924,7 @@ function renderDriverList() {
   if (!state.filteredDrivers.length) {
     const emptyRow = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 4;
+    td.colSpan = 5;
     td.innerHTML = '<div class="empty-state">Нет водителей по заданным фильтрам.</div>';
     emptyRow.appendChild(td);
     elements.tableBody.appendChild(emptyRow);
@@ -537,15 +933,42 @@ function renderDriverList() {
 
   state.filteredDrivers.forEach((driver) => {
     const tr = document.createElement("tr");
-    if (driver.id === state.selectedDriverId && state.cardMode === "view") {
-      tr.classList.add("active");
-    }
+    tr.dataset.driverId = driver.id;
+    tr.tabIndex = 0;
+    tr.setAttribute("aria-label", `Открыть карточку водителя ${getDriverFullName(driver) || ""}`.trim());
+    const isActive = state.cardMode === "view" && driver.id === state.selectedDriverId;
+    tr.classList.toggle("active", isActive);
+    tr.setAttribute("aria-selected", isActive ? "true" : "false");
 
-    tr.addEventListener("click", () => {
+    tr.addEventListener("click", (event) => {
+      if (event.target.closest("input, button, a")) {
+        return;
+      }
       state.selectedDriverId = driver.id;
       state.cardMode = "view";
-      renderDriverCard(driver);
-      highlightSelectedRow(driver.id);
+      openDriverModal(driver.id);
+    });
+
+    tr.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        if (event.key === " ") {
+          event.preventDefault();
+        }
+        state.selectedDriverId = driver.id;
+        state.cardMode = "view";
+        openDriverModal(driver.id);
+      } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const rows = Array.from(elements.tableBody.querySelectorAll("tr[data-driver-id]"));
+        const currentIndex = rows.indexOf(tr);
+        if (currentIndex === -1) {
+          return;
+        }
+        const nextIndex = event.key === "ArrowDown" ? Math.min(currentIndex + 1, rows.length - 1) : Math.max(currentIndex - 1, 0);
+        if (rows[nextIndex]) {
+          rows[nextIndex].focus();
+        }
+      }
     });
 
     const selectCell = document.createElement("td");
@@ -553,7 +976,9 @@ function renderDriverList() {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = state.selectedDriverIds.has(driver.id);
+    checkbox.setAttribute("aria-label", `Выбрать ${getDriverFullName(driver) || "водителя"}`);
     checkbox.addEventListener("click", (event) => event.stopPropagation());
+    checkbox.addEventListener("keydown", (event) => event.stopPropagation());
     checkbox.addEventListener("change", (event) => {
       if (event.target.checked) {
         state.selectedDriverIds.add(driver.id);
@@ -573,6 +998,20 @@ function renderDriverList() {
     nameCell.innerHTML = `<div class="driver-name"><strong>${fullName}</strong>${contactsMarkup}</div>`;
     tr.appendChild(nameCell);
 
+    const countryCell = document.createElement("td");
+    const citizenshipInfo = getDriverCitizenshipInfo(driver);
+    if (citizenshipInfo) {
+      const badge = document.createElement("span");
+      badge.className = `country-chip ${citizenshipInfo.isEu ? "eu" : "non-eu"}`;
+      badge.textContent = `${citizenshipInfo.isEu ? "EU" : "Non-EU"} — ${citizenshipInfo.name}`;
+      badge.title = citizenshipInfo.name;
+      countryCell.appendChild(badge);
+    } else {
+      countryCell.textContent = "—";
+      countryCell.classList.add("text-muted");
+    }
+    tr.appendChild(countryCell);
+
     const statusCell = document.createElement("td");
     statusCell.innerHTML = `<span class="status-badge status-${driver.status}">${STATUS_LABELS[driver.status]}</span>`;
     tr.appendChild(statusCell);
@@ -586,15 +1025,105 @@ function renderDriverList() {
 }
 
 function highlightSelectedRow(id) {
-  Array.from(elements.tableBody.querySelectorAll("tr")).forEach((row, index) => {
-    const driver = state.filteredDrivers[index];
-    if (!driver) return;
-    if (driver.id === id && state.cardMode === "view") {
-      row.classList.add("active");
-    } else {
-      row.classList.remove("active");
-    }
+  Array.from(elements.tableBody.querySelectorAll("tr[data-driver-id]")).forEach((row) => {
+    const isActive = Boolean(id && row.dataset.driverId === id && state.cardMode === "view");
+    row.classList.toggle("active", isActive);
+    row.setAttribute("aria-selected", isActive ? "true" : "false");
   });
+}
+
+function getDriverCitizenshipInfo(driver) {
+  if (!driver) {
+    return null;
+  }
+
+  const personalValue = driver.personal?.citizenship || "";
+  const personalCode = resolveCountryCode(personalValue);
+  let code = personalCode;
+  let fallbackValue = personalValue;
+
+  if (!code) {
+    const passport = getPrimaryPassport(driver);
+    if (passport) {
+      code = resolveCountryCode(passport.country || passport.country_code || "");
+      fallbackValue = passport.country || passport.country_code || fallbackValue;
+    }
+  }
+
+  if (!code) {
+    return null;
+  }
+
+  const normalizedCode = code.toUpperCase();
+  return {
+    code: normalizedCode,
+    name: getCountryDisplayName(normalizedCode, fallbackValue),
+    isEu: EU_COUNTRY_CODES.has(normalizedCode)
+  };
+}
+
+function getPrimaryPassport(driver) {
+  if (!driver?.documents?.length) {
+    return null;
+  }
+  const passports = driver.documents.filter((doc) => doc.type === "passport");
+  if (!passports.length) {
+    return null;
+  }
+  const explicitPrimary = passports.find((doc) => doc.primary || doc.extra?.primary);
+  if (explicitPrimary) {
+    return explicitPrimary;
+  }
+  const sorted = [...passports].sort((a, b) => parseDateForSort(a.issueDate) - parseDateForSort(b.issueDate));
+  return sorted[0] || passports[0];
+}
+
+function resolveCountryCode(value) {
+  if (!value || typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (/^[a-z]{2}$/i.test(trimmed)) {
+    return trimmed.toUpperCase();
+  }
+  const normalized = trimmed.normalize
+    ? trimmed.normalize("NFD").replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
+    : trimmed;
+  const cleaned = normalized.replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s-]/g, "");
+  const key = cleaned.replace(/\s+/g, " ").trim().toLowerCase();
+  if (!key) {
+    return null;
+  }
+  return COUNTRY_CODE_ALIASES[key] || null;
+}
+
+function getCountryDisplayName(code, fallbackValue = "") {
+  if (!code) {
+    return fallbackValue || "—";
+  }
+  let localized = null;
+  if (REGION_DISPLAY) {
+    try {
+      localized = REGION_DISPLAY.of(code);
+    } catch (error) {
+      localized = null;
+    }
+  }
+  if (localized && localized !== code) {
+    return localized;
+  }
+  return COUNTRY_NAME_FALLBACK[code] || fallbackValue || code;
+}
+
+function parseDateForSort(value) {
+  if (!value) {
+    return Number.POSITIVE_INFINITY;
+  }
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? Number.POSITIVE_INFINITY : timestamp;
 }
 
 function renderDocumentBadges(driver) {
@@ -649,15 +1178,28 @@ function normalizeDate(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
-function renderDriverCard(driver) {
+function renderDriverCard(driver, options = {}) {
+  const { preserveScroll = false } = options;
+  const previousScroll = elements.driverCard ? elements.driverCard.scrollTop : 0;
+
   if (state.cardMode === "create") {
     renderCreateDriverForm();
+    if (state.modalOpen) {
+      elements.driverCard.scrollTop = 0;
+      updateModalFocusables();
+    }
     return;
   }
 
   if (!driver) {
     elements.driverCard.classList.add("placeholder");
-    elements.driverCard.innerHTML = "<p>Нет данных для отображения. Измените фильтры или создайте нового водителя.</p>";
+    elements.driverCard.innerHTML = `
+      <h2 id="driverModalTitle" class="visually-hidden">Карточка водителя</h2>
+      <p>Нет данных для отображения. Измените фильтры или создайте нового водителя.</p>
+    `;
+    if (state.modalOpen) {
+      updateModalFocusables();
+    }
     return;
   }
 
@@ -693,7 +1235,7 @@ function renderDriverCard(driver) {
   elements.driverCard.innerHTML = `
     <div class="card-header">
       <div>
-        <h2>${getDriverFullName(driver)}</h2>
+        <h2 id="driverModalTitle">${getDriverFullName(driver)}</h2>
         <div class="card-meta">
           <span>Дата рождения: ${formatDate(driver.personal.birthDate)}</span>
           <span>Гражданство: ${driver.personal.citizenship || "—"}</span>
@@ -816,6 +1358,18 @@ function renderDriverCard(driver) {
     </section>
   `;
 
+  if (preserveScroll) {
+    requestAnimationFrame(() => {
+      elements.driverCard.scrollTop = previousScroll;
+    });
+  } else {
+    elements.driverCard.scrollTop = 0;
+  }
+
+  if (state.modalOpen) {
+    updateModalFocusables();
+  }
+
   const commentForm = document.getElementById("commentForm");
   if (commentForm) {
     commentForm.addEventListener("submit", (event) => {
@@ -834,7 +1388,7 @@ function renderDriverCard(driver) {
       });
       textarea.value = "";
       setAppMessage("Комментарий добавлен.", "success");
-      renderDriverCard(driver);
+      renderDriverCard(driver, { preserveScroll: true });
     });
   }
 }
@@ -1095,7 +1649,7 @@ function renderCreateDriverForm() {
   elements.driverCard.innerHTML = `
     <div class="card-header">
       <div>
-        <h2>Новый водитель</h2>
+        <h2 id="driverModalTitle">Новый водитель</h2>
         <div class="card-meta">Заполните обязательные поля для создания карточки.</div>
       </div>
     </div>
@@ -1140,7 +1694,7 @@ function renderCreateDriverForm() {
 
   cancelButton.addEventListener("click", () => {
     state.cardMode = "view";
-    refresh();
+    closeDriverModal();
   });
 
   form.addEventListener("submit", (event) => {
@@ -1219,6 +1773,16 @@ function renderCreateDriverForm() {
     setAppMessage("Водитель создан.", "success");
     refresh();
   });
+
+  if (state.modalOpen) {
+    updateModalFocusables();
+    setTimeout(() => {
+      const lastNameInput = document.getElementById("createLastName");
+      if (lastNameInput) {
+        lastNameInput.focus();
+      }
+    }, 0);
+  }
 }
 
 init();
