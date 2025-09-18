@@ -1,25 +1,90 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>G-Track Mini App</title>
+  <title>G-Track · Водители</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>G-Track: Заявка</h1>
-  <form id="orderForm">
-    <input type="text" placeholder="Откуда" id="from" required>
-    <input type="text" placeholder="Куда" id="to" required>
-    <input type="date" id="date" required>
-    <input type="text" placeholder="Груз" id="cargo" required>
-    <input type="number" placeholder="Вес (кг)" id="weight" required>
-    <input type="number" placeholder="Цена (€)" id="price" required>
-    <input type="text" placeholder="Client Reference" id="reference">
-    <button type="submit">Создать заявку</button>
-  </form>
-  <div id="orders"></div>
+  <header class="app-header">
+    <div>
+      <h1>G-Track · Водители</h1>
+      <p class="app-subtitle">Карточки, документы, напоминания</p>
+    </div>
+    <div class="header-actions">
+      <button id="addDriverBtn" class="secondary">Добавить водителя</button>
+      <button id="sendReminderBtn" class="primary" disabled>Отправить напоминания</button>
+    </div>
+  </header>
+
+  <section class="filters" aria-label="Фильтры списка водителей">
+    <label class="filter-item">
+      <span>Поиск</span>
+      <input type="search" id="searchInput" placeholder="Имя, e-mail, телефон">
+    </label>
+    <label class="filter-item">
+      <span>Статус</span>
+      <select id="statusFilter">
+        <option value="all">Все</option>
+        <option value="active">Активен</option>
+        <option value="on_leave">В отпуске</option>
+        <option value="inactive">Неактивен</option>
+        <option value="terminated">Уволен</option>
+      </select>
+    </label>
+    <label class="filter-item">
+      <span>Статус документов</span>
+      <select id="documentFilter">
+        <option value="all">Любой</option>
+        <option value="expired">Просрочено</option>
+        <option value="soon">Истекает ≤ 30</option>
+        <option value="warning">Истекает 31-60</option>
+        <option value="valid">Актуально</option>
+        <option value="unknown">Без срока</option>
+      </select>
+    </label>
+    <label class="filter-checkbox">
+      <input type="checkbox" id="czResidenceFilter">
+      <span>Только с пропиской CZ</span>
+    </label>
+    <label class="filter-checkbox">
+      <input type="checkbox" id="a1SwFilter">
+      <span>Только с A1 SW</span>
+    </label>
+  </section>
+
+  <div id="appMessage" role="status" aria-live="polite"></div>
+
+  <main class="app-layout">
+    <section class="drivers-panel" aria-label="Список водителей">
+      <div class="panel-header">
+        <h2>Водители</h2>
+        <div class="list-meta"><span id="driversCount">0</span> водителей</div>
+      </div>
+      <div class="table-wrapper">
+        <table class="drivers-table">
+          <thead>
+            <tr>
+              <th class="select-col"><input type="checkbox" id="selectAll"></th>
+              <th>ФИО / контакты</th>
+              <th>Статус</th>
+              <th>Документы</th>
+            </tr>
+          </thead>
+          <tbody id="driversTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card-panel" aria-label="Карточка водителя">
+      <div id="driverCard" class="card-content placeholder">
+        <p>Выберите водителя из списка или создайте нового.</p>
+      </div>
+    </section>
+  </main>
+
   <script src="main.js"></script>
 </body>
 </html>
