@@ -1,0 +1,15 @@
+{
+  "name": "gtrack-mini-app",
+  "version": "1.0.0",
+  "description": "G-Track drivers module",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^30.1.2"
+  },
+  "jest": {
+    "testEnvironment": "jsdom"
+  }
+}

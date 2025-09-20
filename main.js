@@ -27,19 +27,40 @@ const STATUS_LABELS = {
 };
 
 const DOCUMENT_LABELS = {
-  passport: "Паспорт",
-  visa: "Виза",
-  licence: "Водительское удостоверение",
-  medical: "Медосмотр",
-  psihotest: "Психотест",
-  insurance: "Страховка",
-  travel_insurance: "Путешествия",
+  license_generic: "Лицензия (общая)",
+  a1: "A1 (EU)",
+  a1_switzerland: "A1 Switzerland",
+  declaration: "Декларация",
+  insurance: "Pojištění",
+  travel_insurance: "Cestovní pojištění",
+  residence: "Прописка (Propiska)",
+  licence: "Права (Driver’s licence)",
   adr: "ADR",
+  tacho_card: "Чип (тахограф)",
   code95: "Код 95",
-  tacho_card: "Тахокарта",
-  declaration: "Declaration",
-  a1: "A1"
+  medical: "Медицинская prohlídka",
+  psihotest: "Психотест",
+  visa: "Виза / Биометрия",
+  passport: "Паспорт"
 };
+
+const DOCUMENT_DEFINITIONS = [
+  { type: "license_generic", label: DOCUMENT_LABELS.license_generic, showNumber: false, showCountry: false },
+  { type: "a1", label: DOCUMENT_LABELS.a1, showNumber: false, showCountry: false },
+  { type: "a1_switzerland", label: DOCUMENT_LABELS.a1_switzerland, showNumber: false, showCountry: false },
+  { type: "declaration", label: DOCUMENT_LABELS.declaration, showNumber: false, showCountry: false },
+  { type: "insurance", label: DOCUMENT_LABELS.insurance, showNumber: false, showCountry: false },
+  { type: "travel_insurance", label: DOCUMENT_LABELS.travel_insurance, showNumber: false, showCountry: false },
+  { type: "residence", label: DOCUMENT_LABELS.residence, showNumber: false, showCountry: false },
+  { type: "licence", label: DOCUMENT_LABELS.licence, showNumber: true, showCountry: false },
+  { type: "adr", label: DOCUMENT_LABELS.adr, showNumber: false, showCountry: false },
+  { type: "tacho_card", label: DOCUMENT_LABELS.tacho_card, showNumber: true, showCountry: false },
+  { type: "code95", label: DOCUMENT_LABELS.code95, showNumber: false, showCountry: false },
+  { type: "medical", label: DOCUMENT_LABELS.medical, showNumber: false, showCountry: false },
+  { type: "psihotest", label: DOCUMENT_LABELS.psihotest, showNumber: false, showCountry: false },
+  { type: "visa", label: DOCUMENT_LABELS.visa, showNumber: true, showCountry: true },
+  { type: "passport", label: DOCUMENT_LABELS.passport, showNumber: true, showCountry: true }
+];
 
 const DOCUMENT_STATUS_LABELS = {
   expired: "Просрочен",
@@ -47,6 +68,12 @@ const DOCUMENT_STATUS_LABELS = {
   warning: "Истекает 31-60",
   valid: "Актуален",
   unknown: "Без срока"
+};
+
+const GENDER_LABELS = {
+  male: "Мужской",
+  female: "Женский",
+  other: "Другое"
 };
 
 const EU_COUNTRY_CODES = new Set([
@@ -381,9 +408,111 @@ function getLatestDocumentFile(doc) {
   return doc.files[0];
 }
 
+function ensureDocumentRecord(driver, type) {
+  if (!driver) {
+    return null;
+  }
+  driver.documents = Array.isArray(driver.documents) ? driver.documents : [];
+  let doc = driver.documents.find((item) => item.type === type);
+  if (!doc) {
+    doc = {
+      id: `${driver.id || "driver"}-${type}`,
+      type,
+      number: null,
+      issueDate: null,
+      expiryDate: null,
+      country: null,
+      files: [],
+      extra: {}
+    };
+    driver.documents.push(doc);
+  }
+  return doc;
+}
+
+function isDocumentEmpty(doc) {
+  if (!doc) {
+    return true;
+  }
+  const hasCoreFields = Boolean(
+    doc.number ||
+      doc.issueDate ||
+      doc.expiryDate ||
+      doc.country ||
+      doc.countryCode ||
+      doc.country_code ||
+      doc.issuer ||
+      (Array.isArray(doc.categories) && doc.categories.length) ||
+      (Array.isArray(doc.files) && doc.files.length)
+  );
+  const hasExtra = doc.extra && Object.values(doc.extra).some((value) => Boolean(value));
+  return !(hasCoreFields || hasExtra);
+}
+
+function getDocumentEffectiveExpiry(doc, driver) {
+  if (!doc) {
+    return null;
+  }
+  if (doc.expiryDate) {
+    return doc.expiryDate;
+  }
+  if (doc.type === "psihotest") {
+    return calculatePsihotestExpiry(driver?.personal?.birthDate, doc.issueDate);
+  }
+  return null;
+}
+
+function calculatePsihotestExpiry(birthDate, completionDate) {
+  if (!completionDate) {
+    return null;
+  }
+  const completion = new Date(completionDate);
+  if (Number.isNaN(completion.getTime())) {
+    return null;
+  }
+  const age = getAgeOnDate(birthDate, completion);
+  const yearsToAdd = age !== null && age >= 60 ? 1 : 3;
+  const expiry = new Date(completion);
+  expiry.setFullYear(expiry.getFullYear() + yearsToAdd);
+  return expiry.toISOString().split("T")[0];
+}
+
+function getAgeOnDate(birthDate, referenceDate) {
+  if (!birthDate) {
+    return null;
+  }
+  const birth = new Date(birthDate);
+  const reference = new Date(referenceDate);
+  if (Number.isNaN(birth.getTime()) || Number.isNaN(reference.getTime())) {
+    return null;
+  }
+  let age = reference.getFullYear() - birth.getFullYear();
+  const monthDiff = reference.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && reference.getDate() < birth.getDate())) {
+    age -= 1;
+  }
+  return age;
+}
+
+function formatDocumentCountryOrIssuer(doc) {
+  if (!doc) {
+    return "—";
+  }
+  const countryValue = doc.country || doc.countryCode || doc.country_code;
+  if (countryValue) {
+    const code = resolveCountryCode(countryValue);
+    if (code) {
+      return getCountryDisplayName(code, countryValue);
+    }
+    return typeof countryValue === "string" ? countryValue : String(countryValue);
+  }
+  return doc.issuer || "—";
+}
+
 const driversData = [
   {
     id: "drv-001",
+    internalNumber: "DRV-0001",
     status: "active",
     personal: {
       firstName: "Jan",
@@ -405,6 +534,7 @@ const driversData = [
         startDate: "2018-02-01",
         endDate: null,
         type: "permanent",
+        indefinite: true,
         signed: true,
         signedBy: "dir-001"
       },
@@ -424,20 +554,63 @@ const driversData = [
     },
     documents: [
       {
-        id: "drv-001-passport",
-        type: "passport",
-        number: "CZ1234567",
-        issueDate: "2021-01-15",
-        expiryDate: "2031-01-14",
-        country: "CZ",
+        id: "drv-001-license",
+        type: "license_generic",
+        issueDate: "2019-01-10",
+        expiryDate: "2026-01-09",
         files: [
-          createMockFile("passport_jan_2025.pdf", {
-            uploadedAt: "2025-07-02T10:15:00Z",
-            sizeBytes: Math.round(980 * 1024)
-          }),
-          createMockFile("passport_jan_2024.pdf", {
-            uploadedAt: "2024-01-20T09:00:00Z",
-            sizeBytes: Math.round(1.2 * 1024 * 1024)
+          createMockFile("company_license.pdf", {
+            uploadedAt: "2024-12-28T10:00:00Z",
+            sizeBytes: Math.round(0.5 * 1024 * 1024)
+          })
+        ]
+      },
+      {
+        id: "drv-001-a1",
+        type: "a1",
+        issueDate: "2025-01-01",
+        expiryDate: "2025-12-31",
+        files: []
+      },
+      {
+        id: "drv-001-a1-sw",
+        type: "a1_switzerland",
+        issueDate: "2025-01-01",
+        expiryDate: "2025-12-31",
+        files: []
+      },
+      {
+        id: "drv-001-declaration",
+        type: "declaration",
+        issueDate: "2024-03-01",
+        expiryDate: "2025-03-01",
+        extra: { handed_over: true },
+        files: []
+      },
+      {
+        id: "drv-001-insurance",
+        type: "insurance",
+        issueDate: "2025-01-01",
+        expiryDate: "2025-12-31",
+        files: []
+      },
+      {
+        id: "drv-001-travel-insurance",
+        type: "travel_insurance",
+        issueDate: "2025-01-01",
+        expiryDate: "2025-12-31",
+        files: []
+      },
+      {
+        id: "drv-001-residence",
+        type: "residence",
+        issueDate: "2020-04-15",
+        expiryDate: "2030-04-14",
+        issuer: "Praha 20",
+        files: [
+          createMockFile("residence_confirmation.pdf", {
+            uploadedAt: "2020-04-16T09:30:00Z",
+            sizeBytes: Math.round(0.3 * 1024 * 1024)
           })
         ]
       },
@@ -457,25 +630,10 @@ const driversData = [
         ]
       },
       {
-        id: "drv-001-medical",
-        type: "medical",
-        issueDate: "2024-02-01",
-        expiryDate: "2026-02-01",
-        files: []
-      },
-      {
-        id: "drv-001-psihotest",
-        type: "psihotest",
-        issueDate: "2023-11-12",
-        expiryDate: "2025-11-11",
-        files: []
-      },
-      {
-        id: "drv-001-a1",
-        type: "a1",
-        issueDate: "2025-01-01",
-        expiryDate: "2025-12-31",
-        extra: { a1_sw: false },
+        id: "drv-001-adr",
+        type: "adr",
+        issueDate: "2023-03-01",
+        expiryDate: "2026-03-01",
         files: []
       },
       {
@@ -492,12 +650,52 @@ const driversData = [
         ]
       },
       {
-        id: "drv-001-declaration",
-        type: "declaration",
-        issueDate: "2024-03-01",
-        expiryDate: "2025-03-01",
-        extra: { handed_over: true },
+        id: "drv-001-code95",
+        type: "code95",
+        issueDate: "2022-09-01",
+        expiryDate: "2026-08-31",
         files: []
+      },
+      {
+        id: "drv-001-medical",
+        type: "medical",
+        issueDate: "2024-02-01",
+        expiryDate: "2026-02-01",
+        files: []
+      },
+      {
+        id: "drv-001-psihotest",
+        type: "psihotest",
+        issueDate: "2023-11-12",
+        expiryDate: null,
+        files: []
+      },
+      {
+        id: "drv-001-visa",
+        type: "visa",
+        number: null,
+        issueDate: null,
+        expiryDate: null,
+        country: null,
+        files: []
+      },
+      {
+        id: "drv-001-passport",
+        type: "passport",
+        number: "CZ1234567",
+        issueDate: "2021-01-15",
+        expiryDate: "2031-01-14",
+        country: "CZ",
+        files: [
+          createMockFile("passport_jan_2025.pdf", {
+            uploadedAt: "2025-07-02T10:15:00Z",
+            sizeBytes: Math.round(980 * 1024)
+          }),
+          createMockFile("passport_jan_2024.pdf", {
+            uploadedAt: "2024-01-20T09:00:00Z",
+            sizeBytes: Math.round(1.2 * 1024 * 1024)
+          })
+        ]
       }
     ],
     salary: {
@@ -544,6 +742,7 @@ const driversData = [
   },
   {
     id: "drv-002",
+    internalNumber: "DRV-0002",
     status: "on_leave",
     personal: {
       firstName: "Olena",
@@ -565,6 +764,7 @@ const driversData = [
         startDate: "2022-05-10",
         endDate: "2025-05-09",
         type: "fixed",
+        indefinite: false,
         signed: true,
         signedBy: "dir-002"
       },
@@ -584,32 +784,33 @@ const driversData = [
     },
     documents: [
       {
-        id: "drv-002-passport",
-        type: "passport",
-        number: "EP123456",
-        issueDate: "2020-09-01",
-        expiryDate: "2030-08-31",
-        country: "UA",
-        files: [
-          createMockFile("olena_passport_2023.pdf", {
-            uploadedAt: "2023-09-15T09:45:00Z",
-            sizeBytes: Math.round(860 * 1024)
-          })
-        ]
+        id: "drv-002-license",
+        type: "license_generic",
+        issueDate: "2022-05-05",
+        expiryDate: "2025-05-04",
+        files: []
       },
       {
-        id: "drv-002-visa",
-        type: "visa",
-        number: "CZV-556677",
-        issueDate: "2024-05-15",
-        expiryDate: "2025-05-14",
-        country: "CZ",
-        files: [
-          createMockFile("olena_visa_2024.pdf", {
-            uploadedAt: "2024-05-16T13:20:00Z",
-            sizeBytes: Math.round(780 * 1024)
-          })
-        ]
+        id: "drv-002-a1",
+        type: "a1",
+        issueDate: "2024-02-01",
+        expiryDate: "2024-12-31",
+        files: []
+      },
+      {
+        id: "drv-002-a1-sw",
+        type: "a1_switzerland",
+        issueDate: "2024-02-01",
+        expiryDate: "2024-12-31",
+        files: []
+      },
+      {
+        id: "drv-002-declaration",
+        type: "declaration",
+        issueDate: "2024-02-15",
+        expiryDate: "2025-02-14",
+        extra: { handed_over: false },
+        files: []
       },
       {
         id: "drv-002-insurance",
@@ -626,11 +827,28 @@ const driversData = [
         files: []
       },
       {
-        id: "drv-002-a1",
-        type: "a1",
-        issueDate: "2024-02-01",
-        expiryDate: "2024-12-31",
-        extra: { a1_sw: true },
+        id: "drv-002-residence",
+        type: "residence",
+        issueDate: "2023-02-10",
+        expiryDate: "2024-02-09",
+        issuer: "Kladno",
+        files: []
+      },
+      {
+        id: "drv-002-licence",
+        type: "licence",
+        number: "UA112233",
+        issueDate: "2019-08-20",
+        expiryDate: "2029-08-19",
+        categories: ["C"],
+        country: "UA",
+        files: []
+      },
+      {
+        id: "drv-002-adr",
+        type: "adr",
+        issueDate: "2022-06-01",
+        expiryDate: "2025-06-01",
         files: []
       },
       {
@@ -647,6 +865,48 @@ const driversData = [
         issueDate: "2020-10-01",
         expiryDate: "2025-10-01",
         files: []
+      },
+      {
+        id: "drv-002-medical",
+        type: "medical",
+        issueDate: "2023-09-20",
+        expiryDate: "2025-09-20",
+        files: []
+      },
+      {
+        id: "drv-002-psihotest",
+        type: "psihotest",
+        issueDate: "2023-10-18",
+        expiryDate: null,
+        files: []
+      },
+      {
+        id: "drv-002-visa",
+        type: "visa",
+        number: "CZV-556677",
+        issueDate: "2024-05-15",
+        expiryDate: "2025-05-14",
+        country: "CZ",
+        files: [
+          createMockFile("olena_visa_2024.pdf", {
+            uploadedAt: "2024-05-16T13:20:00Z",
+            sizeBytes: Math.round(780 * 1024)
+          })
+        ]
+      },
+      {
+        id: "drv-002-passport",
+        type: "passport",
+        number: "EP123456",
+        issueDate: "2020-09-01",
+        expiryDate: "2030-08-31",
+        country: "UA",
+        files: [
+          createMockFile("olena_passport_2023.pdf", {
+            uploadedAt: "2023-09-15T09:45:00Z",
+            sizeBytes: Math.round(860 * 1024)
+          })
+        ]
       }
     ],
     salary: {
@@ -682,6 +942,7 @@ const driversData = [
   },
   {
     id: "drv-003",
+    internalNumber: "DRV-0003",
     status: "terminated",
     personal: {
       firstName: "Marek",
@@ -703,6 +964,7 @@ const driversData = [
         startDate: "2014-03-01",
         endDate: "2024-06-15",
         type: "permanent",
+        indefinite: false,
         signed: true,
         signedBy: "dir-003"
       },
@@ -722,18 +984,55 @@ const driversData = [
     },
     documents: [
       {
-        id: "drv-003-passport",
-        type: "passport",
-        number: "CZ7654321",
-        issueDate: "2016-04-04",
-        expiryDate: "2026-04-03",
-        country: "CZ",
-        files: [
-          createMockFile("marek_passport_2022.pdf", {
-            uploadedAt: "2022-04-06T07:30:00Z",
-            sizeBytes: Math.round(910 * 1024)
-          })
-        ]
+        id: "drv-003-license",
+        type: "license_generic",
+        issueDate: "2014-03-01",
+        expiryDate: "2020-03-01",
+        files: []
+      },
+      {
+        id: "drv-003-a1",
+        type: "a1",
+        issueDate: "2022-01-01",
+        expiryDate: "2022-12-31",
+        files: []
+      },
+      {
+        id: "drv-003-a1-sw",
+        type: "a1_switzerland",
+        issueDate: null,
+        expiryDate: null,
+        files: []
+      },
+      {
+        id: "drv-003-declaration",
+        type: "declaration",
+        issueDate: "2022-03-01",
+        expiryDate: "2023-03-01",
+        extra: { handed_over: true },
+        files: []
+      },
+      {
+        id: "drv-003-insurance",
+        type: "insurance",
+        issueDate: "2023-01-01",
+        expiryDate: "2023-12-31",
+        files: []
+      },
+      {
+        id: "drv-003-travel",
+        type: "travel_insurance",
+        issueDate: "2023-01-01",
+        expiryDate: "2023-12-31",
+        files: []
+      },
+      {
+        id: "drv-003-residence",
+        type: "residence",
+        issueDate: "2014-03-01",
+        expiryDate: "2024-03-01",
+        issuer: "Kladno",
+        files: []
       },
       {
         id: "drv-003-licence",
@@ -743,13 +1042,6 @@ const driversData = [
         expiryDate: "2025-06-01",
         categories: ["C", "E"],
         country: "CZ",
-        files: []
-      },
-      {
-        id: "drv-003-medical",
-        type: "medical",
-        issueDate: "2022-01-10",
-        expiryDate: "2024-01-09",
         files: []
       },
       {
@@ -766,6 +1058,50 @@ const driversData = [
         issueDate: "2019-09-01",
         expiryDate: "2024-09-01",
         files: []
+      },
+      {
+        id: "drv-003-code95",
+        type: "code95",
+        issueDate: "2018-05-01",
+        expiryDate: "2023-05-01",
+        files: []
+      },
+      {
+        id: "drv-003-medical",
+        type: "medical",
+        issueDate: "2022-01-10",
+        expiryDate: "2024-01-09",
+        files: []
+      },
+      {
+        id: "drv-003-psihotest",
+        type: "psihotest",
+        issueDate: "2021-11-15",
+        expiryDate: null,
+        files: []
+      },
+      {
+        id: "drv-003-visa",
+        type: "visa",
+        number: null,
+        issueDate: null,
+        expiryDate: null,
+        country: null,
+        files: []
+      },
+      {
+        id: "drv-003-passport",
+        type: "passport",
+        number: "CZ7654321",
+        issueDate: "2016-04-04",
+        expiryDate: "2026-04-03",
+        country: "CZ",
+        files: [
+          createMockFile("marek_passport_2022.pdf", {
+            uploadedAt: "2022-04-06T07:30:00Z",
+            sizeBytes: Math.round(910 * 1024)
+          })
+        ]
       }
     ],
     salary: {
@@ -803,8 +1139,7 @@ const state = {
     search: "",
     status: "all",
     document: "all",
-    czResidence: false,
-    a1Sw: false
+    euOnly: false
   },
   selectedDriverId: null,
   selectedDriverIds: new Set(),
@@ -831,8 +1166,7 @@ const elements = {
   searchInput: document.getElementById("searchInput"),
   statusFilter: document.getElementById("statusFilter"),
   documentFilter: document.getElementById("documentFilter"),
-  czResidenceFilter: document.getElementById("czResidenceFilter"),
-  a1SwFilter: document.getElementById("a1SwFilter"),
+  euOnlyFilter: document.getElementById("euOnlyFilter"),
   modal: document.getElementById("driverModal"),
   modalContainer: document.querySelector("#driverModal .modal-container"),
   modalBackdrop: document.querySelector("#driverModal [data-modal-dismiss]"),
@@ -867,13 +1201,8 @@ function attachEvents() {
     refresh();
   });
 
-  elements.czResidenceFilter.addEventListener("change", () => {
-    state.filters.czResidence = elements.czResidenceFilter.checked;
-    refresh();
-  });
-
-  elements.a1SwFilter.addEventListener("change", () => {
-    state.filters.a1Sw = elements.a1SwFilter.checked;
+  elements.euOnlyFilter.addEventListener("change", () => {
+    state.filters.euOnly = elements.euOnlyFilter.checked;
     refresh();
   });
 
@@ -950,19 +1279,18 @@ function getFilteredDrivers() {
       return false;
     }
 
-    if (state.filters.czResidence && !driver.flags?.czResidence) {
-      return false;
-    }
-
-    if (state.filters.a1Sw) {
-      const hasA1Sw = driver.documents.some((doc) => doc.type === "a1" && doc.extra?.a1_sw);
-      if (!hasA1Sw) {
+    if (state.filters.euOnly) {
+      const info = getDriverCitizenshipInfo(driver);
+      if (!info?.isEu) {
         return false;
       }
     }
 
     if (state.filters.document !== "all") {
-      const matchesDocument = driver.documents.some((doc) => getDocumentStatus(doc) === state.filters.document);
+      const docs = Array.isArray(driver.documents) ? driver.documents : [];
+      const matchesDocument = docs.some(
+        (doc) => !isDocumentEmpty(doc) && getDocumentStatus(doc, driver) === state.filters.document
+      );
       if (!matchesDocument) {
         return false;
       }
@@ -1129,7 +1457,7 @@ function renderDriverList() {
   if (!state.filteredDrivers.length) {
     const emptyRow = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 5;
+    td.colSpan = 4;
     td.innerHTML = '<div class="empty-state">Нет водителей по заданным фильтрам.</div>';
     emptyRow.appendChild(td);
     elements.tableBody.appendChild(emptyRow);
@@ -1203,20 +1531,6 @@ function renderDriverList() {
     nameCell.innerHTML = `<div class="driver-name"><strong>${fullName}</strong>${contactsMarkup}</div>`;
     tr.appendChild(nameCell);
 
-    const countryCell = document.createElement("td");
-    const citizenshipInfo = getDriverCitizenshipInfo(driver);
-    if (citizenshipInfo) {
-      const badge = document.createElement("span");
-      badge.className = `country-chip ${citizenshipInfo.isEu ? "eu" : "non-eu"}`;
-      badge.textContent = `${citizenshipInfo.isEu ? "EU" : "Non-EU"} — ${citizenshipInfo.name}`;
-      badge.title = citizenshipInfo.name;
-      countryCell.appendChild(badge);
-    } else {
-      countryCell.textContent = "—";
-      countryCell.classList.add("text-muted");
-    }
-    tr.appendChild(countryCell);
-
     const statusCell = document.createElement("td");
     statusCell.innerHTML = `<span class="status-badge status-${driver.status}">${STATUS_LABELS[driver.status]}</span>`;
     tr.appendChild(statusCell);
@@ -1265,6 +1579,18 @@ function getDriverCitizenshipInfo(driver) {
     name: getCountryDisplayName(normalizedCode, fallbackValue),
     isEu: EU_COUNTRY_CODES.has(normalizedCode)
   };
+}
+
+function shouldShowRodneCislo(driver) {
+  if (!driver?.personal?.rodneCislo) {
+    return false;
+  }
+  const citizenshipCode = resolveCountryCode(driver.personal.citizenship || "");
+  if (citizenshipCode && citizenshipCode.toUpperCase() === "CZ") {
+    return true;
+  }
+  const docs = Array.isArray(driver.documents) ? driver.documents : [];
+  return docs.some((doc) => doc.type === "visa" && resolveCountryCode(doc.country || doc.countryCode) === "CZ");
 }
 
 function getPrimaryPassport(driver) {
@@ -1350,18 +1676,23 @@ function renderDocumentBadges(driver) {
 
 function getDriverDocumentSummary(driver) {
   const summary = { expired: 0, soon: 0, warning: 0, valid: 0, unknown: 0 };
-  driver.documents.forEach((doc) => {
-    const status = getDocumentStatus(doc);
+  const docs = Array.isArray(driver.documents) ? driver.documents : [];
+  docs.forEach((doc) => {
+    if (isDocumentEmpty(doc)) {
+      return;
+    }
+    const status = getDocumentStatus(doc, driver);
     summary[status] = (summary[status] || 0) + 1;
   });
   return summary;
 }
 
-function getDocumentStatus(doc) {
-  if (!doc.expiryDate) {
+function getDocumentStatus(doc, driver) {
+  const expiryValue = getDocumentEffectiveExpiry(doc, driver);
+  if (!expiryValue) {
     return "unknown";
   }
-  const expiry = new Date(doc.expiryDate);
+  const expiry = new Date(expiryValue);
   if (Number.isNaN(expiry.getTime())) {
     return "unknown";
   }
@@ -1439,15 +1770,22 @@ function renderDriverCard(driver, options = {}) {
   const perDiemDeductionTotal = (perDiem.deductions || []).reduce((sum, item) => sum + (item.amount || 0), 0);
   const perDiemNet = perDiemTotal - perDiemDeductionTotal;
 
+  const metaItems = [
+    `Дата рождения: ${formatDate(driver.personal.birthDate)}`,
+    `Гражданство: ${driver.personal.citizenship || "—"}`,
+    `Внутренний №: ${driver.internalNumber || "—"}`
+  ];
+  if (shouldShowRodneCislo(driver)) {
+    metaItems.push(`RČ: ${driver.personal.rodneCislo}`);
+  }
+  const metaMarkup = metaItems.map((item) => `<span>${item}</span>`).join("");
+
   elements.driverCard.innerHTML = `
     <div class="card-header">
       <div>
         <h2 id="driverModalTitle">${getDriverFullName(driver)}</h2>
         <div class="card-meta">
-          <span>Дата рождения: ${formatDate(driver.personal.birthDate)}</span>
-          <span>Гражданство: ${driver.personal.citizenship || "—"}</span>
-          ${driver.personal.rodneCislo ? `<span>RČ: ${driver.personal.rodneCislo}</span>` : ""}
-          ${tags.join(" ")}
+          ${metaMarkup}${tags.length ? ` ${tags.join(" ")}` : ""}
         </div>
       </div>
       <span class="status-badge status-${driver.status}">${STATUS_LABELS[driver.status]}</span>
@@ -1460,6 +1798,8 @@ function renderDriverCard(driver, options = {}) {
           <tr><th>Имя</th><td>${driver.personal.firstName || "—"}</td></tr>
           <tr><th>Фамилия</th><td>${driver.personal.lastName || "—"}</td></tr>
           <tr><th>Отчество</th><td>${driver.personal.middleName || "—"}</td></tr>
+          <tr><th>Пол</th><td>${formatGender(driver.personal.gender)}</td></tr>
+          <tr><th>Внутренний №</th><td>${driver.internalNumber || "—"}</td></tr>
           <tr><th>Телефон</th><td>${driver.personal.phone || "—"}</td></tr>
           <tr><th>E-mail</th><td>${driver.personal.email || "—"}</td></tr>
           <tr><th>Адрес регистрации</th><td>${driver.personal.registrationAddress || "—"}</td></tr>
@@ -1649,17 +1989,19 @@ function renderDriverCard(driver, options = {}) {
 function renderPrimaryDocuments(driver) {
   const documents = Array.isArray(driver.documents) ? driver.documents : [];
   const importantDocs = [
-    { type: "passport", label: "Паспорт" },
-    { type: "licence", label: "Водительское удостоверение" },
-    { type: "tacho_card", label: "Чип (тахокарта)" }
+    { type: "passport", label: DOCUMENT_LABELS.passport },
+    { type: "licence", label: DOCUMENT_LABELS.licence },
+    { type: "tacho_card", label: DOCUMENT_LABELS.tacho_card }
   ];
 
   const cards = importantDocs.map(({ type, label }) => {
     const doc = documents.find((item) => item.type === type) || null;
     const number = doc?.number || "—";
-    const expiry = doc ? formatDate(doc.expiryDate) : "—";
+    const expiryRaw = doc ? getDocumentEffectiveExpiry(doc, driver) : null;
+    const expiry = expiryRaw ? formatDate(expiryRaw) : "—";
     const latestFile = getLatestDocumentFile(doc);
-    const status = doc ? getDocumentStatus(doc) : null;
+    const hasData = doc && !isDocumentEmpty(doc);
+    const status = hasData ? getDocumentStatus(doc, driver) : null;
     const statusLabel = status ? DOCUMENT_STATUS_LABELS[status] : "Нет данных";
     const lastFileDate = latestFile ? formatDate(latestFile.uploadedAt) : null;
     const hasLastFileDate = lastFileDate && lastFileDate !== "—";
@@ -1687,31 +2029,37 @@ function renderPrimaryDocuments(driver) {
 }
 
 function renderDocumentsRows(driver) {
-  if (!driver.documents.length) {
-    return '<tr><td colspan="8">Документы не загружены.</td></tr>';
-  }
-  return driver.documents
-    .map((doc, index) => {
-      const status = getDocumentStatus(doc);
-      const extras = renderDocumentExtras(doc);
-      const docId = getDocumentIdentifier(driver, doc, index);
-      return `
-        <tr>
-          <td>${DOCUMENT_LABELS[doc.type] || doc.type}</td>
-          <td>${doc.number || "—"}</td>
-          <td>${formatDate(doc.issueDate)}</td>
-          <td>${formatDate(doc.expiryDate)}</td>
-          <td>${doc.country || doc.issuer || "—"}</td>
-          <td><span class="badge ${status}">${DOCUMENT_STATUS_LABELS[status]}</span></td>
-          <td class="doc-file-cell">${renderDocumentFileCell(driver, doc, docId)}</td>
-          <td>${extras}</td>
-        </tr>
-      `;
-    })
-    .join("");
+  driver.documents = Array.isArray(driver.documents) ? driver.documents : [];
+  return DOCUMENT_DEFINITIONS.map((definition, orderIndex) => {
+    const doc = ensureDocumentRecord(driver, definition.type);
+    const docIndex = driver.documents.indexOf(doc);
+    const docId = getDocumentIdentifier(driver, doc, docIndex >= 0 ? docIndex : orderIndex);
+    const hasData = !isDocumentEmpty(doc);
+    const issue = doc?.issueDate ? formatDate(doc.issueDate) : "—";
+    const expiryRaw = getDocumentEffectiveExpiry(doc, driver);
+    const expiry = expiryRaw ? formatDate(expiryRaw) : "—";
+    const statusCode = hasData ? getDocumentStatus(doc, driver) : "unknown";
+    const statusLabel = hasData ? DOCUMENT_STATUS_LABELS[statusCode] : "Нет данных";
+    const numberValue = definition.showNumber === false ? "—" : doc?.number || "—";
+    const countryValue = definition.showCountry === false ? doc?.issuer || "—" : formatDocumentCountryOrIssuer(doc);
+    const extras = renderDocumentExtras(doc, driver);
+
+    return `
+      <tr>
+        <td>${definition.label}</td>
+        <td>${numberValue}</td>
+        <td>${issue}</td>
+        <td>${expiry}</td>
+        <td>${countryValue}</td>
+        <td><span class="badge ${statusCode}">${statusLabel}</span></td>
+        <td class="doc-file-cell">${renderDocumentFileCell(driver, doc, docId)}</td>
+        <td>${extras}</td>
+      </tr>
+    `;
+  }).join("");
 }
 
-function renderDocumentExtras(doc) {
+function renderDocumentExtras(doc, driver) {
   const extras = [];
   if (doc.categories?.length) {
     extras.push(`Категории: ${doc.categories.join(", ")}`);
@@ -1721,6 +2069,12 @@ function renderDocumentExtras(doc) {
   }
   if (doc.extra?.handed_over) {
     extras.push("Передано водителю");
+  }
+  if (doc.type === "psihotest") {
+    const nextDue = getDocumentEffectiveExpiry(doc, driver);
+    if (nextDue) {
+      extras.push(`Следующее прохождение до ${formatDate(nextDue)}`);
+    }
   }
   if (doc.extra?.note) {
     extras.push(doc.extra.note);
@@ -1879,9 +2233,11 @@ function showDocumentHistoryModal(driver, doc) {
 function formatContract(contract) {
   if (!contract) return "—";
   const typeLabel = contract.type === "permanent" ? "Бессрочный" : "Срочный";
-  const dates = `${formatDate(contract.startDate)} — ${formatDate(contract.endDate)}`;
+  const period = contract.indefinite
+    ? `С ${formatDate(contract.startDate)}`
+    : `${formatDate(contract.startDate)} — ${formatDate(contract.endDate)}`;
   const signed = contract.signed ? `Подписан (${DIRECTORS[contract.signedBy] || "директор"})` : "Не подписан";
-  return `${typeLabel}, ${dates}, ${signed}`;
+  return `${typeLabel}, ${period}, ${signed}`;
 }
 
 function formatSalaryType(type) {
@@ -1999,6 +2355,13 @@ function formatCurrency(value, currency = "EUR") {
   return new Intl.NumberFormat("ru", { style: "currency", currency }).format(Number(value));
 }
 
+function formatGender(value) {
+  if (!value) {
+    return "—";
+  }
+  return GENDER_LABELS[value] || value;
+}
+
 function getDriverFullName(driver) {
   return [driver.personal.lastName, driver.personal.firstName, driver.personal.middleName]
     .filter(Boolean)
@@ -2077,13 +2440,16 @@ function sendDocumentReminders() {
   const payload = selectedDrivers.map((driver) => ({
     id: driver.id,
     fullName: getDriverFullName(driver),
-    documents: driver.documents
-      .filter((doc) => ["expired", "soon", "warning"].includes(getDocumentStatus(doc)))
+    documents: (Array.isArray(driver.documents) ? driver.documents : [])
+      .filter(
+        (doc) =>
+          !isDocumentEmpty(doc) && ["expired", "soon", "warning"].includes(getDocumentStatus(doc, driver))
+      )
       .map((doc) => ({
         type: doc.type,
         label: DOCUMENT_LABELS[doc.type] || doc.type,
-        status: getDocumentStatus(doc),
-        expiryDate: doc.expiryDate || null
+        status: getDocumentStatus(doc, driver),
+        expiryDate: getDocumentEffectiveExpiry(doc, driver) || null
       }))
   }));
 
@@ -2207,6 +2573,16 @@ function sendToTelegram(data) {
   }
 }
 
+function generateInternalNumber() {
+  const numbers = driversData
+    .map((driver) => driver.internalNumber)
+    .filter(Boolean)
+    .map((value) => Number.parseInt(String(value).replace(/[^0-9]/g, ""), 10))
+    .filter((num) => !Number.isNaN(num));
+  const next = numbers.length ? Math.max(...numbers) + 1 : driversData.length + 1;
+  return `DRV-${String(next).padStart(4, "0")}`;
+}
+
 function renderCreateDriverForm() {
   elements.driverCard.classList.remove("placeholder");
   elements.driverCard.innerHTML = `
@@ -2270,6 +2646,7 @@ function renderCreateDriverForm() {
     }
     const newDriver = {
       id: `drv-${Date.now()}`,
+      internalNumber: generateInternalNumber(),
       status: document.getElementById("createStatus").value,
       personal: {
         firstName,
@@ -2291,6 +2668,7 @@ function renderCreateDriverForm() {
           startDate: new Date().toISOString().split("T")[0],
           endDate: null,
           type: "permanent",
+          indefinite: true,
           signed: false,
           signedBy: null
         },
@@ -2346,6 +2724,37 @@ function renderCreateDriverForm() {
       }
     }, 0);
   }
+}
+
+const testingApi = {
+  tg,
+  state,
+  driversData,
+  DOCUMENT_LABELS,
+  DOCUMENT_DEFINITIONS,
+  getFilteredDrivers,
+  getDriverCitizenshipInfo,
+  getDriverById,
+  calculatePsihotestExpiry,
+  getDocumentEffectiveExpiry,
+  getDocumentStatus,
+  isDocumentEmpty,
+  openDriverModal,
+  renderDriverCard,
+  refresh,
+  sendDocumentReminders,
+  formatDate,
+  formatDateTime,
+  formatDriverContacts,
+  formatGender
+};
+
+if (typeof window !== "undefined") {
+  window.__GTRACK__ = testingApi;
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = testingApi;
 }
 
 init();
