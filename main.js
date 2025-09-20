@@ -270,6 +270,117 @@ const REGION_DISPLAY = typeof Intl !== "undefined" && typeof Intl.DisplayNames =
 const FOCUSABLE_SELECTORS =
   'a[href], area[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
+const ALLOWED_FILE_EXTENSIONS = [".pdf", ".png", ".jpg", ".jpeg"];
+const ALLOWED_MIME_TYPES = ["application/pdf", "image/png", "image/jpeg"];
+const FILE_ACCEPT_ATTRIBUTE = ALLOWED_FILE_EXTENSIONS.join(",");
+
+function createMockFile(name, options = {}) {
+  const {
+    mime = "application/pdf",
+    uploadedAt = new Date().toISOString(),
+    sizeBytes = 512 * 1024,
+    content = "Файл-заглушка для предпросмотра"
+  } = options;
+
+  let url = "#";
+  if (typeof Blob !== "undefined" && typeof URL !== "undefined" && typeof URL.createObjectURL === "function") {
+    try {
+      const blob = new Blob([content], { type: mime });
+      url = URL.createObjectURL(blob);
+    } catch (error) {
+      console.warn("Не удалось создать заглушку файла", error);
+    }
+  }
+
+  return {
+    id: `mock-${Math.random().toString(36).slice(2, 9)}`,
+    name,
+    uploadedAt,
+    size: sizeBytes,
+    mime,
+    url,
+    mock: true
+  };
+}
+
+function formatFileSize(bytes) {
+  if (bytes === undefined || bytes === null || Number.isNaN(Number(bytes))) {
+    return "—";
+  }
+  const units = ["Б", "КБ", "МБ", "ГБ"];
+  let size = Number(bytes);
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size % 1 === 0 ? size : size.toFixed(1)} ${units[unitIndex]}`;
+}
+
+function validateFileInput(file) {
+  if (!file) {
+    return { valid: false, error: "Файл не выбран." };
+  }
+
+  if (file.size > MAX_FILE_SIZE) {
+    return { valid: false, error: "Файл превышает 20 МБ." };
+  }
+
+  const extension = file.name ? file.name.substring(file.name.lastIndexOf(".")).toLowerCase() : "";
+  const isAllowedExtension = ALLOWED_FILE_EXTENSIONS.includes(extension);
+  const isAllowedMime = ALLOWED_MIME_TYPES.includes(file.type);
+
+  if (!isAllowedExtension && !isAllowedMime) {
+    return { valid: false, error: "Допускаются только PDF, PNG или JPEG." };
+  }
+
+  return { valid: true };
+}
+
+function buildFileRecordFromInput(file) {
+  const uploadedAt = new Date().toISOString();
+  let url = "#";
+  if (typeof URL !== "undefined" && typeof URL.createObjectURL === "function") {
+    try {
+      url = URL.createObjectURL(file);
+    } catch (error) {
+      console.warn("Не удалось создать ссылку на файл", error);
+    }
+  }
+
+  return {
+    id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name: file.name,
+    uploadedAt,
+    size: file.size,
+    mime: file.type || guessMimeFromExtension(file.name),
+    url
+  };
+}
+
+function guessMimeFromExtension(name = "") {
+  const extension = name.substring(name.lastIndexOf(".")).toLowerCase();
+  switch (extension) {
+    case ".pdf":
+      return "application/pdf";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".png":
+      return "image/png";
+    default:
+      return "application/octet-stream";
+  }
+}
+
+function getLatestDocumentFile(doc) {
+  if (!doc || !doc.files || !doc.files.length) {
+    return null;
+  }
+  return doc.files[0];
+}
+
 const driversData = [
   {
     id: "drv-001",
@@ -313,47 +424,80 @@ const driversData = [
     },
     documents: [
       {
+        id: "drv-001-passport",
         type: "passport",
         number: "CZ1234567",
         issueDate: "2021-01-15",
         expiryDate: "2031-01-14",
-        country: "CZ"
+        country: "CZ",
+        files: [
+          createMockFile("passport_jan_2025.pdf", {
+            uploadedAt: "2025-07-02T10:15:00Z",
+            sizeBytes: Math.round(980 * 1024)
+          }),
+          createMockFile("passport_jan_2024.pdf", {
+            uploadedAt: "2024-01-20T09:00:00Z",
+            sizeBytes: Math.round(1.2 * 1024 * 1024)
+          })
+        ]
       },
       {
+        id: "drv-001-licence",
         type: "licence",
         number: "CZ998877",
         issueDate: "2020-05-10",
         expiryDate: "2030-05-09",
         categories: ["C", "E"],
-        country: "CZ"
+        country: "CZ",
+        files: [
+          createMockFile("drivers_licence_jan.pdf", {
+            uploadedAt: "2024-11-18T08:00:00Z",
+            sizeBytes: Math.round(740 * 1024)
+          })
+        ]
       },
       {
+        id: "drv-001-medical",
         type: "medical",
         issueDate: "2024-02-01",
-        expiryDate: "2026-02-01"
+        expiryDate: "2026-02-01",
+        files: []
       },
       {
+        id: "drv-001-psihotest",
         type: "psihotest",
         issueDate: "2023-11-12",
-        expiryDate: "2025-11-11"
+        expiryDate: "2025-11-11",
+        files: []
       },
       {
+        id: "drv-001-a1",
         type: "a1",
         issueDate: "2025-01-01",
         expiryDate: "2025-12-31",
-        extra: { a1_sw: false }
+        extra: { a1_sw: false },
+        files: []
       },
       {
+        id: "drv-001-tacho",
         type: "tacho_card",
         number: "1234567890",
         issueDate: "2021-08-01",
-        expiryDate: "2025-08-01"
+        expiryDate: "2025-08-01",
+        files: [
+          createMockFile("tachograph_card_2023.pdf", {
+            uploadedAt: "2023-08-02T12:00:00Z",
+            sizeBytes: Math.round(620 * 1024)
+          })
+        ]
       },
       {
+        id: "drv-001-declaration",
         type: "declaration",
         issueDate: "2024-03-01",
         expiryDate: "2025-03-01",
-        extra: { handed_over: true }
+        extra: { handed_over: true },
+        files: []
       }
     ],
     salary: {
@@ -383,11 +527,19 @@ const driversData = [
       { date: "2025-07-01", action: "Командировки", details: "Расчёт per-diem за июнь", author: "Accounting · Marek V." }
     ],
     comments: [
-      { date: "2025-08-18T08:30:00Z", author: "HR Анна", text: "Запросить продление A1 за 60 дней до срока." }
+      {
+        date: "2025-08-18T08:30:00Z",
+        author: "HR Анна",
+        text: "Запросить продление A1 за 60 дней до срока.",
+        file: createMockFile("a1_extension_plan.pdf", {
+          uploadedAt: "2025-08-18T08:25:00Z",
+          sizeBytes: Math.round(340 * 1024)
+        })
+      }
     ],
     files: [
-      { name: "passport_jan.pdf", uploadedAt: "2024-01-20", size: "1.2 MB", description: "Паспорт" },
-      { name: "a1_2025.pdf", uploadedAt: "2025-01-03", size: "0.4 MB", description: "A1 сертификат" }
+      { ...createMockFile("passport_jan.pdf", { uploadedAt: "2024-01-20T09:00:00Z", sizeBytes: Math.round(1.2 * 1024 * 1024) }), description: "Паспорт" },
+      { ...createMockFile("a1_2025.pdf", { uploadedAt: "2025-01-03T11:00:00Z", sizeBytes: Math.round(420 * 1024) }), description: "A1 сертификат" }
     ]
   },
   {
@@ -432,45 +584,69 @@ const driversData = [
     },
     documents: [
       {
+        id: "drv-002-passport",
         type: "passport",
         number: "EP123456",
         issueDate: "2020-09-01",
         expiryDate: "2030-08-31",
-        country: "UA"
+        country: "UA",
+        files: [
+          createMockFile("olena_passport_2023.pdf", {
+            uploadedAt: "2023-09-15T09:45:00Z",
+            sizeBytes: Math.round(860 * 1024)
+          })
+        ]
       },
       {
+        id: "drv-002-visa",
         type: "visa",
         number: "CZV-556677",
         issueDate: "2024-05-15",
         expiryDate: "2025-05-14",
-        country: "CZ"
+        country: "CZ",
+        files: [
+          createMockFile("olena_visa_2024.pdf", {
+            uploadedAt: "2024-05-16T13:20:00Z",
+            sizeBytes: Math.round(780 * 1024)
+          })
+        ]
       },
       {
+        id: "drv-002-insurance",
         type: "insurance",
         issueDate: "2024-04-01",
-        expiryDate: "2025-04-01"
+        expiryDate: "2025-04-01",
+        files: []
       },
       {
+        id: "drv-002-travel",
         type: "travel_insurance",
         issueDate: "2024-04-01",
-        expiryDate: "2025-04-01"
+        expiryDate: "2025-04-01",
+        files: []
       },
       {
+        id: "drv-002-a1",
         type: "a1",
         issueDate: "2024-02-01",
         expiryDate: "2024-12-31",
-        extra: { a1_sw: true }
+        extra: { a1_sw: true },
+        files: []
       },
       {
+        id: "drv-002-tacho",
         type: "tacho_card",
         number: "9080706050",
         issueDate: "2021-12-10",
-        expiryDate: "2024-12-09"
+        expiryDate: "2024-12-09",
+        files: []
       },
       {
+        id: "drv-002-code95",
         type: "code95",
         issueDate: "2020-10-01",
-        expiryDate: "2025-10-01"
+        expiryDate: "2025-10-01",
+        files: []
       }
     ],
     salary: {
@@ -501,7 +677,7 @@ const driversData = [
       { date: "2025-07-02T10:12:00Z", author: "Dispatcher", text: "После отпуска требуется обновить обучение по ADR." }
     ],
     files: [
-      { name: "visa_2024.pdf", uploadedAt: "2024-05-16", size: "0.8 MB", description: "Виза" }
+      { ...createMockFile("visa_2024.pdf", { uploadedAt: "2024-05-16T13:25:00Z", sizeBytes: Math.round(0.8 * 1024 * 1024) }), description: "Виза" }
     ]
   },
   {
@@ -546,35 +722,50 @@ const driversData = [
     },
     documents: [
       {
+        id: "drv-003-passport",
         type: "passport",
         number: "CZ7654321",
         issueDate: "2016-04-04",
         expiryDate: "2026-04-03",
-        country: "CZ"
+        country: "CZ",
+        files: [
+          createMockFile("marek_passport_2022.pdf", {
+            uploadedAt: "2022-04-06T07:30:00Z",
+            sizeBytes: Math.round(910 * 1024)
+          })
+        ]
       },
       {
+        id: "drv-003-licence",
         type: "licence",
         number: "CZ445566",
         issueDate: "2015-06-01",
         expiryDate: "2025-06-01",
         categories: ["C", "E"],
-        country: "CZ"
+        country: "CZ",
+        files: []
       },
       {
+        id: "drv-003-medical",
         type: "medical",
         issueDate: "2022-01-10",
-        expiryDate: "2024-01-09"
+        expiryDate: "2024-01-09",
+        files: []
       },
       {
+        id: "drv-003-adr",
         type: "adr",
         issueDate: "2021-02-01",
-        expiryDate: "2024-02-01"
+        expiryDate: "2024-02-01",
+        files: []
       },
       {
+        id: "drv-003-tacho",
         type: "tacho_card",
         number: "4455667788",
         issueDate: "2019-09-01",
-        expiryDate: "2024-09-01"
+        expiryDate: "2024-09-01",
+        files: []
       }
     ],
     salary: {
@@ -602,7 +793,7 @@ const driversData = [
       { date: "2024-06-20T12:00:00Z", author: "Accounting", text: "Закрыть выплату компенсации за отпуск." }
     ],
     files: [
-      { name: "termination_protocol.pdf", uploadedAt: "2024-06-16", size: "0.6 MB", description: "Протокол увольнения" }
+      { ...createMockFile("termination_protocol.pdf", { uploadedAt: "2024-06-16T15:40:00Z", sizeBytes: Math.round(0.6 * 1024 * 1024) }), description: "Протокол увольнения" }
     ]
   }
 ];
@@ -619,7 +810,8 @@ const state = {
   selectedDriverIds: new Set(),
   cardMode: "view",
   filteredDrivers: [],
-  modalOpen: false
+  modalOpen: false,
+  pendingDocumentUpload: null
 };
 
 const modalState = {
@@ -646,6 +838,13 @@ const elements = {
   modalBackdrop: document.querySelector("#driverModal [data-modal-dismiss]"),
   modalClose: document.querySelector("#driverModal .modal-close")
 };
+
+const documentUploadInput = document.createElement("input");
+documentUploadInput.type = "file";
+documentUploadInput.accept = FILE_ACCEPT_ATTRIBUTE;
+documentUploadInput.hidden = true;
+document.body.appendChild(documentUploadInput);
+documentUploadInput.addEventListener("change", handleDocumentFileSelected);
 
 function init() {
   attachEvents();
@@ -702,6 +901,10 @@ function attachEvents() {
   }
 
   document.addEventListener("keydown", handleGlobalKeyDown, { passive: false });
+
+  if (elements.driverCard) {
+    elements.driverCard.addEventListener("click", handleDriverCardClick);
+  }
 }
 
 function refresh() {
@@ -822,6 +1025,8 @@ function closeDriverModal() {
 
   state.modalOpen = false;
   state.cardMode = "view";
+  state.pendingDocumentUpload = null;
+  document.querySelectorAll(".file-history-overlay").forEach((node) => node.remove());
 
   if (elements.modal) {
     elements.modal.setAttribute("hidden", "");
@@ -1203,6 +1408,8 @@ function renderDriverCard(driver, options = {}) {
     return;
   }
 
+  document.querySelectorAll(".file-history-overlay").forEach((node) => node.remove());
+
   elements.driverCard.classList.remove("placeholder");
   const summary = getDriverDocumentSummary(driver);
   const docBadges = Object.entries(summary)
@@ -1287,6 +1494,11 @@ function renderDriverCard(driver, options = {}) {
     </section>
 
     <section>
+      <h3>Основные документы</h3>
+      ${renderPrimaryDocuments(driver)}
+    </section>
+
+    <section>
       <h3>Документы</h3>
       <div class="table-wrapper">
         <table class="documents-table">
@@ -1298,6 +1510,7 @@ function renderDriverCard(driver, options = {}) {
               <th>Действует до</th>
               <th>Страна/Орган</th>
               <th>Статус</th>
+              <th>Файлы</th>
               <th>Примечания</th>
             </tr>
           </thead>
@@ -1351,6 +1564,11 @@ function renderDriverCard(driver, options = {}) {
       <form class="comment-form" id="commentForm">
         <label for="commentInput">Новый комментарий</label>
         <textarea id="commentInput" placeholder="Добавьте комментарий по документам или задачам..."></textarea>
+        <label class="file-input">
+          <span>Прикрепить файл (PDF, PNG, JPEG; до 20 МБ)</span>
+          <input type="file" id="commentFileInput" accept="${FILE_ACCEPT_ATTRIBUTE}">
+        </label>
+        <div class="file-hint text-muted" id="commentFileHint">Файл не выбран</div>
         <div class="actions">
           <button type="submit" class="primary">Сохранить комментарий</button>
         </div>
@@ -1372,6 +1590,18 @@ function renderDriverCard(driver, options = {}) {
 
   const commentForm = document.getElementById("commentForm");
   if (commentForm) {
+    const commentFileInput = document.getElementById("commentFileInput");
+    const commentFileHint = document.getElementById("commentFileHint");
+
+    if (commentFileInput && commentFileHint) {
+      commentFileInput.addEventListener("change", () => {
+        const file = commentFileInput.files?.[0];
+        commentFileHint.textContent = file
+          ? `${file.name} (${formatFileSize(file.size)})`
+          : "Файл не выбран";
+      });
+    }
+
     commentForm.addEventListener("submit", (event) => {
       event.preventDefault();
       const textarea = commentForm.querySelector("#commentInput");
@@ -1381,26 +1611,90 @@ function renderDriverCard(driver, options = {}) {
         return;
       }
       driver.comments = driver.comments || [];
-      driver.comments.unshift({
+      let attachment = null;
+      if (commentFileInput && commentFileInput.files?.[0]) {
+        const candidate = commentFileInput.files[0];
+        const validation = validateFileInput(candidate);
+        if (!validation.valid) {
+          setAppMessage(validation.error, "error");
+          return;
+        }
+        attachment = buildFileRecordFromInput(candidate);
+      }
+
+      const newComment = {
         date: new Date().toISOString(),
         author: "Вы",
         text
-      });
+      };
+
+      if (attachment) {
+        newComment.file = attachment;
+      }
+
+      driver.comments.unshift(newComment);
       textarea.value = "";
+      if (commentFileInput) {
+        commentFileInput.value = "";
+      }
+      if (commentFileHint) {
+        commentFileHint.textContent = "Файл не выбран";
+      }
       setAppMessage("Комментарий добавлен.", "success");
       renderDriverCard(driver, { preserveScroll: true });
     });
   }
 }
 
+function renderPrimaryDocuments(driver) {
+  const documents = Array.isArray(driver.documents) ? driver.documents : [];
+  const importantDocs = [
+    { type: "passport", label: "Паспорт" },
+    { type: "licence", label: "Водительское удостоверение" },
+    { type: "tacho_card", label: "Чип (тахокарта)" }
+  ];
+
+  const cards = importantDocs.map(({ type, label }) => {
+    const doc = documents.find((item) => item.type === type) || null;
+    const number = doc?.number || "—";
+    const expiry = doc ? formatDate(doc.expiryDate) : "—";
+    const latestFile = getLatestDocumentFile(doc);
+    const status = doc ? getDocumentStatus(doc) : null;
+    const statusLabel = status ? DOCUMENT_STATUS_LABELS[status] : "Нет данных";
+    const lastFileDate = latestFile ? formatDate(latestFile.uploadedAt) : null;
+    const hasLastFileDate = lastFileDate && lastFileDate !== "—";
+
+    const statusBadge = status
+      ? `<span class="badge ${status}">${statusLabel}</span>`
+      : '<span class="badge unknown">Нет данных</span>';
+
+    return `
+      <article class="doc-card" data-doc-type="${type}">
+        <header>
+          <span class="doc-card-title">${label}</span>
+          ${statusBadge}
+        </header>
+        <dl>
+          <div><dt>Номер</dt><dd>${number}</dd></div>
+          <div><dt>Действует до</dt><dd>${expiry}</dd></div>
+          <div><dt>Файл</dt><dd>${hasLastFileDate ? `от ${lastFileDate}` : "Не загружен"}</dd></div>
+        </dl>
+      </article>
+    `;
+  });
+
+  return `<div class="primary-documents">${cards.join("")}</div>`;
+}
+
 function renderDocumentsRows(driver) {
   if (!driver.documents.length) {
-    return '<tr><td colspan="7">Документы не загружены.</td></tr>';
+    return '<tr><td colspan="8">Документы не загружены.</td></tr>';
   }
   return driver.documents
-    .map((doc) => {
+    .map((doc, index) => {
       const status = getDocumentStatus(doc);
       const extras = renderDocumentExtras(doc);
+      const docId = getDocumentIdentifier(driver, doc, index);
       return `
         <tr>
           <td>${DOCUMENT_LABELS[doc.type] || doc.type}</td>
@@ -1409,6 +1703,7 @@ function renderDocumentsRows(driver) {
           <td>${formatDate(doc.expiryDate)}</td>
           <td>${doc.country || doc.issuer || "—"}</td>
           <td><span class="badge ${status}">${DOCUMENT_STATUS_LABELS[status]}</span></td>
+          <td class="doc-file-cell">${renderDocumentFileCell(driver, doc, docId)}</td>
           <td>${extras}</td>
         </tr>
       `;
@@ -1431,6 +1726,154 @@ function renderDocumentExtras(doc) {
     extras.push(doc.extra.note);
   }
   return extras.length ? extras.join(" · ") : "—";
+}
+
+function getDocumentIdentifier(driver, doc, index) {
+  if (doc.id) {
+    return doc.id;
+  }
+  const fallback = `${driver?.id || "driver"}-${doc?.type || "doc"}-${index}`;
+  doc.id = fallback;
+  return fallback;
+}
+
+function renderDocumentFileCell(driver, doc, docId) {
+  const files = Array.isArray(doc.files) ? doc.files : [];
+  const latestFile = files[0] || null;
+  const hasFile = Boolean(latestFile);
+  const lastUploadLabel = hasFile
+    ? `последнее обновление: ${formatDate(latestFile.uploadedAt)}`
+    : "Файл не загружен";
+
+  const driverId = driver?.id || "";
+  const historyDisabled = files.length ? "" : " disabled";
+  const viewDisabled = hasFile ? "" : " disabled";
+
+  const viewTitle = hasFile
+    ? `Открыть файл ${latestFile.name}`
+    : "Файл не загружен";
+
+  return `
+    <div class="doc-file-actions">
+      <button type="button" class="icon-button file-indicator ${hasFile ? "has-file" : "no-file"}" data-action="doc-view" data-doc-id="${docId}" data-driver-id="${driverId}" title="${viewTitle}" aria-label="${viewTitle}"${viewDisabled}>
+        <span aria-hidden="true">📎</span>
+      </button>
+      <button type="button" class="text-link" data-action="doc-upload" data-doc-id="${docId}" data-driver-id="${driverId}" title="Загрузить файл (PDF, PNG, JPEG; до 20 МБ)">Загрузить</button>
+      <button type="button" class="text-link" data-action="doc-history" data-doc-id="${docId}" data-driver-id="${driverId}"${historyDisabled} title="История загруженных версий">История</button>
+    </div>
+    <div class="doc-file-meta">${lastUploadLabel}</div>
+  `;
+}
+
+function getDocumentById(driver, docId) {
+  if (!driver || !driver.documents || !docId) {
+    return null;
+  }
+
+  return (
+    driver.documents.find((doc, index) => {
+      if (doc.id === docId) {
+        return true;
+      }
+      const fallback = `${driver.id || "driver"}-${doc.type || "doc"}-${index}`;
+      if (!doc.id) {
+        doc.id = fallback;
+      }
+      return doc.id === docId;
+    }) || null
+  );
+}
+
+function openFileInNewTab(file) {
+  if (!file) {
+    setAppMessage("Файл недоступен.", "error");
+    return;
+  }
+
+  if (!file.url || file.url === "#") {
+    setAppMessage("Файл недоступен для просмотра.", "error");
+    return;
+  }
+
+  const newWindow = window.open(file.url, "_blank", "noopener");
+  if (!newWindow) {
+    setAppMessage("Не удалось открыть файл. Разрешите всплывающие окна.", "error");
+  }
+}
+
+function showDocumentHistoryModal(driver, doc) {
+  if (!doc || !doc.files || !doc.files.length) {
+    return;
+  }
+
+  document.querySelectorAll(".file-history-overlay").forEach((node) => node.remove());
+
+  const overlay = document.createElement("div");
+  overlay.className = "file-history-overlay";
+
+  const docId = doc.id || `${driver?.id || "driver"}-${doc.type || "doc"}`;
+  const titleId = `history-${docId}`;
+  const docLabel = DOCUMENT_LABELS[doc.type] || doc.type;
+
+  const listItems = doc.files
+    .map((file, index) => {
+      const badge = index === 0 ? '<span class="file-history-chip">Текущая версия</span>' : "";
+      return `
+        <li>
+          <div class="file-history-item">
+            <div class="file-history-info">
+              <div class="file-history-name">
+                <strong>${file.name}</strong>
+                ${badge}
+              </div>
+              <span class="text-muted">${formatFileSize(file.size)}</span>
+              <div class="text-muted">${formatDateTime(file.uploadedAt)}</div>
+            </div>
+            <button type="button" class="text-link" data-history-open="${file.id}">Открыть</button>
+          </div>
+        </li>
+      `;
+    })
+    .join("");
+
+  overlay.innerHTML = `
+    <div class="file-history-dialog" role="dialog" aria-modal="true" aria-labelledby="${titleId}" tabindex="-1">
+      <div class="file-history-header">
+        <h4 id="${titleId}">История загрузок — ${docLabel}</h4>
+        <button type="button" class="icon-button close" data-history-close aria-label="Закрыть историю">&times;</button>
+      </div>
+      <ul class="file-history-list">${listItems}</ul>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  const dialog = overlay.querySelector(".file-history-dialog");
+  if (dialog) {
+    dialog.focus();
+    dialog.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        overlay.remove();
+      }
+    });
+  }
+
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay || event.target.hasAttribute("data-history-close")) {
+      overlay.remove();
+      return;
+    }
+    const historyButton = event.target.closest("[data-history-open]");
+    if (historyButton) {
+      const fileId = historyButton.getAttribute("data-history-open");
+      const fileRecord = doc.files.find((item) => item.id === fileId);
+      if (fileRecord) {
+        openFileInNewTab(fileRecord);
+      } else {
+        setAppMessage("Файл не найден.", "error");
+      }
+    }
+  });
 }
 
 function formatContract(contract) {
@@ -1477,7 +1920,7 @@ function renderFiles(files = []) {
       (file) => `
         <li>
           <strong>${file.description || "Файл"}</strong><br>
-          ${file.name} · ${file.size || "—"} · загружен ${formatDate(file.uploadedAt)}
+          ${file.name} · ${formatFileSize(file.size)} · загружен ${formatDate(file.uploadedAt)}
         </li>
       `
     )
@@ -1504,12 +1947,28 @@ function renderComments(comments = []) {
     return '<div class="empty-state">Комментариев пока нет.</div>';
   }
   return `<ul class="comments-list">${comments
-    .map((comment) => `
-      <li>
-        <strong>${comment.author || "—"}</strong> · ${formatDateTime(comment.date)}<br>
-        ${comment.text}
-      </li>
-    `)
+    .map((comment, index) => {
+      const textBlock = comment.text ? `<p>${comment.text}</p>` : "";
+      const attachment = comment.file
+        ? `
+          <div class="comment-attachment">
+            <button type="button" class="attachment-link" data-action="comment-open-file" data-comment-index="${index}">
+              <span aria-hidden="true">📎</span>
+              ${comment.file.name}
+            </button>
+            <span class="text-muted">(${formatFileSize(comment.file.size)})</span>
+          </div>
+        `
+        : "";
+
+      return `
+        <li>
+          <strong>${comment.author || "—"}</strong> · ${formatDateTime(comment.date)}
+          ${textBlock}
+          ${attachment}
+        </li>
+      `;
+    })
     .join("")}</ul>`;
 }
 
@@ -1634,6 +2093,110 @@ function sendDocumentReminders() {
 
   sendToTelegram({ action: "send_document_reminders", drivers: payload });
   setAppMessage(`Подготовлено уведомлений: ${payload.length}.`, "success");
+}
+
+function handleDriverCardClick(event) {
+  const actionElement = event.target.closest("[data-action]");
+  if (!actionElement) {
+    return;
+  }
+
+  const action = actionElement.dataset.action;
+  const driverId = actionElement.dataset.driverId || state.selectedDriverId;
+  const driver = getDriverById(driverId);
+
+  if (!driver) {
+    return;
+  }
+
+  if (action === "doc-upload") {
+    event.preventDefault();
+    state.pendingDocumentUpload = { driverId, docId: actionElement.dataset.docId };
+    documentUploadInput.value = "";
+    documentUploadInput.click();
+    return;
+  }
+
+  if (action === "doc-view") {
+    event.preventDefault();
+    const doc = getDocumentById(driver, actionElement.dataset.docId);
+    if (!doc) {
+      setAppMessage("Документ не найден.", "error");
+      return;
+    }
+    const latestFile = getLatestDocumentFile(doc);
+    if (!latestFile) {
+      setAppMessage("Файл не прикреплён.", "error");
+      return;
+    }
+    openFileInNewTab(latestFile);
+    return;
+  }
+
+  if (action === "doc-history") {
+    event.preventDefault();
+    const doc = getDocumentById(driver, actionElement.dataset.docId);
+    if (!doc || !doc.files || !doc.files.length) {
+      setAppMessage("История файлов пуста.", "info");
+      return;
+    }
+    showDocumentHistoryModal(driver, doc);
+    return;
+  }
+
+  if (action === "comment-open-file") {
+    event.preventDefault();
+    const commentIndex = Number.parseInt(actionElement.dataset.commentIndex, 10);
+    if (Number.isNaN(commentIndex)) {
+      return;
+    }
+    const comment = driver.comments?.[commentIndex];
+    if (!comment || !comment.file) {
+      setAppMessage("Файл не найден.", "error");
+      return;
+    }
+    openFileInNewTab(comment.file);
+  }
+}
+
+function handleDocumentFileSelected(event) {
+  const file = event.target.files?.[0] || null;
+  documentUploadInput.value = "";
+
+  const context = state.pendingDocumentUpload;
+  state.pendingDocumentUpload = null;
+
+  if (!context) {
+    return;
+  }
+
+  const driver = getDriverById(context.driverId);
+  if (!driver) {
+    setAppMessage("Водитель не найден.", "error");
+    return;
+  }
+
+  const doc = getDocumentById(driver, context.docId);
+  if (!doc) {
+    setAppMessage("Документ не найден.", "error");
+    return;
+  }
+
+  if (!file) {
+    setAppMessage("Файл не выбран.", "info");
+    return;
+  }
+
+  const validation = validateFileInput(file);
+  if (!validation.valid) {
+    setAppMessage(validation.error, "error");
+    return;
+  }
+
+  doc.files = Array.isArray(doc.files) ? doc.files : [];
+  doc.files.unshift(buildFileRecordFromInput(file));
+  setAppMessage("Файл загружен и добавлен в историю.", "success");
+  renderDriverCard(driver, { preserveScroll: true });
 }
 
 function sendToTelegram(data) {
